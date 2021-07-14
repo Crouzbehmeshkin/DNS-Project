@@ -25,6 +25,7 @@ class MERCHANT(threading.Thread):
         self.bank_pass = 0
         self.bank_balance = 0
         self.expected_balance = 0
+        self.approved_transaction = False
 
     def L_CA(self):
 
@@ -73,6 +74,9 @@ class MERCHANT(threading.Thread):
                     if kc['type'] == 'balance_response':
                         self.bank_balance = kc['value'][0]
                         self.check_payment()
+                    if kc['type'] == 'money_transaction_approved':
+                        self.approved_transaction = True
+                        print("merchant approves transaction!")
 
                 if not data1:
                     break;
@@ -137,6 +141,7 @@ class MERCHANT(threading.Thread):
             n.join()
 
     def payment_request(self, account, amount):
+        self.approved_transaction = False
         self.amount = amount
         self.expected_balance = self.bank_balance + self.amount
         data = {}

@@ -32,6 +32,8 @@ class BANK(threading.Thread):
         self.exchanger = 0  # have to set this to pub_key of exchanger
         self.is_authenticated = {}
         self.payments = []
+        self.passwords = {}
+
 
         self.pri_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         self.pub_key = self.pri_key.public_key()
@@ -112,7 +114,7 @@ class BANK(threading.Thread):
 
                     if kc['type'] == 'sell_transaction_approved':
                         account_e = kc['value'][3]
-                        transaction_id = kc['value'][-1] # last one should be added to the doc todo
+                        transaction_id = kc['value'][-1]
                         self.finalize_payment(transaction_id, account_e)
                         self.approve_money_transaction(transaction_id)
 
@@ -129,7 +131,7 @@ class BANK(threading.Thread):
 
         x = pickle.dumps(data)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('127.0.0.1', 6745))
+        s.connect(('127.0.0.1', 8000))
         s.sendall(x)
         s.close()
 
@@ -159,7 +161,8 @@ class BANK(threading.Thread):
 
                     if kc['type'] == "request_authentication":
                         CID = kc['value'][1]
-                        if True: # check credentials todo
+                        password = kc['value'][2]
+                        if self.passwords[CID] == password:
                             self.is_authenticated[CID] = 1
                             self.send_authentication_success(CID)
                     if kc['type'] == 'CA certificate':
@@ -189,16 +192,14 @@ class BANK(threading.Thread):
 
     def crypto_sell_req(self, payment_info):
         user_pub_key = payment_info[0]
-        merchant_account = payment_info[1]
         amount = payment_info[2]
         transaction_id = payment_info[3]
-        T = payment_info[4]
 
         data = {}
 
         data['type'] = "crypto_sell_req"
         sig = None
-        data['value'] = [user_pub_key, self.pub_key, amount, datetime.now(), sig]
+        data['value'] = [user_pub_key, self.pub_key, amount, datetime.now(), sig, transaction_id]
 
         x = pickle.dumps(data)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

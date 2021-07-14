@@ -18,7 +18,7 @@ from dateutil.relativedelta import relativedelta
 
 class USER(threading.Thread):
 
-    def __init__(self, id, location, n):
+    def __init__(self, id, location, n, CID, password, merchant_pub_key):
 
         threading.Thread.__init__(self)
 
@@ -28,8 +28,9 @@ class USER(threading.Thread):
         self.bank_pass = 0
         self.amount = 0
         self.bank_public_key = 0
-        self.CID = ""
-        self.password = ""
+        self.CID = CID
+        self.password = password
+        self.merchant_pub_key = merchant_pub_key
         self.is_authenticated = False
 
         self.csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
@@ -145,15 +146,13 @@ class USER(threading.Thread):
 
                     kc = pickle.loads(data1)
 
-                    if kc['type'] == 'payment_issue':
+                    if kc['type'] == 'payment_request':
                         merchant_pub_key_match = (kc['value'][0] == self.merchant_pub_key)
                         amount_match = (kc['value'][1] == self.amount)
-
-                        merchant_sig_match = True#todo
-                        if merchant_pub_key_match and amount_match and merchant_sig_match:
-                            merchant_account = kc['value'][1]
-                            amount = kc['value'][2]
-                            transaction_id = kc['value'][3]
+                        if merchant_pub_key_match and amount_match:
+                            merchant_account = kc['value'][0]
+                            amount = kc['value'][1]
+                            transaction_id = kc['value'][2]
                             self.pay(amount, merchant_account, transaction_id)
                         else:
                             raise Exception("payment info missmatch!")

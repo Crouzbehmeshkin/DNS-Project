@@ -51,21 +51,22 @@ class BLOCKCHAIN(threading.Thread):
                         user_pub_key = kc['value'][0]
                         bank_pub_key = kc['value'][1]
                         amount = kc['value'][2]
+                        transaction_id = kc['value'][-1]
 
                         if authenticated:
                             self.accounts[user_pub_key] -= amount
                             self.accounts[self.exchanger_account] += amount
-                            self.sell_transaction_approved(amount, user_pub_key, bank_pub_key)
+                            self.sell_transaction_approved(amount, user_pub_key, bank_pub_key, transaction_id)
 
                 if not data1:
                     break
 
         return
 
-    def sell_transaction_approved(self, amount, user_pub_key, bank_pub_key):
+    def sell_transaction_approved(self, amount, user_pub_key, bank_pub_key, transaction_id):
         data = {}
         data['type'] = "sell_transaction_approved"
-        data['value'] = [amount, user_pub_key, bank_pub_key, self.account_e, datetime.now()]
+        data['value'] = [amount, user_pub_key, bank_pub_key, self.account_e, datetime.now(), transaction_id]
         x = pickle.dumps(data)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect(('127.0.0.1', 6700))
