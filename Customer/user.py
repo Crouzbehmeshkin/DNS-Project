@@ -167,7 +167,6 @@ class USER(threading.Thread):
         data = {}
 
         data['type'] = "request_authentication"
-        sig = None
         data['value'] = [self.pub_key, self.CID, self.password]
 
         x = pickle.dumps(data)
@@ -178,10 +177,12 @@ class USER(threading.Thread):
 
     def pay(self, amount, merchant_pub_key, transaction_id):
         data = {}
-
-        data['type'] = "payment"
-        sig = None
         now = datetime.now()
+        data['type'] = "payment"
+        message = (str(self.pub_key) + str(merchant_pub_key) + str(amount) + str(transaction_id) + str(now)).encode('utf-8')
+        sig = self.pri_key.sign(
+        message,padding.PSS(mgf = padding.MGF1(hashes.SHA256()), salt_length = padding.PSS.MAX_LENGTH), hashes.SHA256())
+
         data['value'] = [self.pub_key, merchant_pub_key, fiat_to_crypto(amount), transaction_id, now, sig]
 
         x = pickle.dumps(data)
