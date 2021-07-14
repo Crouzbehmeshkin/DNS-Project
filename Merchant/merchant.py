@@ -26,6 +26,8 @@ class MERCHANT(threading.Thread):
         self.bank_balance = 0
         self.expected_balance = 0
         self.approved_transaction = False
+        self.pri_key = None
+        self.public_key = None
 
     def L_CA(self):
 
@@ -88,8 +90,12 @@ class MERCHANT(threading.Thread):
 
         return
     def approve_user_payment(self, account, amount, transaction_id):
-        data = {};
-        sig = None
+        data = {}
+        message = (str(account) + str(amount) + str(transaction_id)).encode(
+            'utf-8')
+        sig = self.pri_key.sign(
+            message, padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+            hashes.SHA256())
         data['type'] = "payment approved"
 
         data['value'] = [transaction_id, sig]
@@ -99,7 +105,7 @@ class MERCHANT(threading.Thread):
         s.connect(('127.0.0.1', 7200))
         s.sendall(x)
         s.close()
-        sig = None
+
 
     # def check_payment(self):
     #     if self.bank_balance == self.expected_balance:
@@ -165,9 +171,16 @@ class MERCHANT(threading.Thread):
         data = {}
 
         data['type'] = "payment_request"
-        sig=None
         client_info = str(account) + str(random.randint(1000, 10000))
-        transaction_id = hashlib.sha256((str(account) + str(amount) + str(client_info) + str(datetime.now())).encode('utf-8')).hexdigest()
+        transaction_id = hashlib.sha256(
+            (str(account) + str(amount) + str(client_info) + str(datetime.now())).encode('utf-8')).hexdigest()
+        message = (str(account) + str(amount) + str(transaction_id)).encode(
+            'utf-8')
+        sig = self.pri_key.sign(
+            message, padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+            hashes.SHA256())
+
+
         data['value'] = [self.pub_key, amount, transaction_id, sig]
 
         x = pickle.dumps(data)
@@ -176,19 +189,6 @@ class MERCHANT(threading.Thread):
         s.sendall(x)
         s.close()
 
-
-    def payment_approve(self, transaction_id):
-        data = {}
-        data['type'] = "payment_approved"
-        sig = None
-
-        data['value'] = [transaction_id, sig]
-
-        x = pickle.dumps(data)
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('127.0.0.1', 7990))
-        s.sendall(x)
-        s.close()
 
 
     # def request_bank_balance(self):
