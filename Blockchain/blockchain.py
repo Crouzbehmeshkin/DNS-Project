@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import numpy as np
 import socket
 import threading
@@ -14,7 +16,7 @@ from cryptography.hazmat.primitives import hashes
 
 class BLOCKCHAIN(threading.Thread):
 
-    def __init__(self, id, location, n):
+    def __init__(self, id, location, n, exchanger_account, bank_account_told_to_exchanger):
 
         threading.Thread.__init__(self)
 
@@ -23,6 +25,8 @@ class BLOCKCHAIN(threading.Thread):
         self.user_Ack = []
         self.deligations = {}
         self.accounts = {}
+        self.exchanger_account = exchanger_account
+        self.account_e = bank_account_told_to_exchanger
 
     def L_bank(self):
 
@@ -42,25 +46,26 @@ class BLOCKCHAIN(threading.Thread):
 
                     kc = pickle.loads(data1)
 
-                    if kc['type'] == 'deligated_payment':
-                        authenticated = True  # todo should put the correct requirements to verify everything
-                        amount = kc['value'][1]
-                        user = kc['value'][0]
-                        exchanger = kc['value'][2]
+                    if kc['type'] == 'crypto_sell_req':
+                        authenticated = True  # todo should put the correct requirements to verify bank identity like balance of the account or validity of deligated rights
+                        user_pub_key = kc['value'][0]
+                        bank_pub_key = kc['value'][1]
+                        amount = kc['value'][2]
+
                         if authenticated:
-                            self.accounts[user] -= amount
-                            self.accounts[exchanger] += amount
-                            self.announce_exchanger_got_paid(kc['value'][-1])
+                            self.accounts[user_pub_key] -= amount
+                            self.accounts[self.exchanger_account] += amount
+                            self.sell_transaction_approved(amount, user_pub_key, bank_pub_key)
 
                 if not data1:
-                    break;
+                    break
 
         return
 
-    def announce_exchanger_got_paid(self, payment_id):
-        data = {};
-        data['type'] = "exchanger_got_paid"
-        data['value'] = payment_id
+    def sell_transaction_approved(self, amount, user_pub_key, bank_pub_key):
+        data = {}
+        data['type'] = "sell_transaction_approved"
+        data['value'] = [amount, user_pub_key, bank_pub_key, self.account_e, datetime.now()]
         x = pickle.dumps(data)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect(('127.0.0.1', 6700))

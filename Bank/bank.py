@@ -1,4 +1,6 @@
+
 import threading
+from datetime import datetime
 
 import numpy as np
 import socket
@@ -28,6 +30,8 @@ class BANK(threading.Thread):
         self.name = 'bank'
         self.accounts = {}
         self.exchanger = 0  # have to set this to pub_key of exchanger
+        self.is_authenticated = {}
+        self.payments = []
 
         self.pri_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         self.pub_key = self.pri_key.public_key()
@@ -80,7 +84,7 @@ class BANK(threading.Thread):
         data = {}
 
         data['type'] = "balance_response"
-        # sig = None
+        sig = None
         data['value'] = [self.accounts[account_pub_key], self.pub_key, sig]
 
         x = pickle.dumps(data)
@@ -106,12 +110,28 @@ class BANK(threading.Thread):
 
                     kc = pickle.loads(data1)
 
-                    if kc['type'] == 'exchnger_got_paid':
-                        payment_id = kc['value'][0]
-                        self.finalize_payment(payment_id)
+                    if kc['type'] == 'sell_transaction_approved':
+                        account_e = kc['value'][3]
+                        transaction_id = kc['value'][-1] # last one should be added to the doc todo
+                        self.finalize_payment(transaction_id, account_e)
+                        self.approve_money_transaction(transaction_id)
 
                 if not data1:
                     break
+    def approve_money_transaction(self, transaction_id):
+        data = {}
+        info = self.payments[transaction_id]
+        merchant_pub_key = info[1]
+        amount = crypto_to_fiat(info[2])
+        data['type'] = "money_transaction_approved"
+        sig = None
+        data['value'] = [merchant_pub_key, amount, transaction_id, sig]
+
+        x = pickle.dumps(data)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(('127.0.0.1', 6745))
+        s.sendall(x)
+        s.close()
 
     def L_USER(self):
 
@@ -139,14 +159,16 @@ class BANK(threading.Thread):
 
                     if kc['type'] == "request_authentication":
                         CID = kc['value'][1]
-                        self.is_authenticated[CID] = 1
-                        self.send_authentication_success()
+                        if True: # check credentials todo
+                            self.is_authenticated[CID] = 1
+                            self.send_authentication_success(CID)
                     if kc['type'] == 'CA certificate':
                         self.certificate = kc['value'][0]
 
                     if kc['type'] == 'payment':
-                        self.payments.append(kc['value'])
-                        self.pay_to_exchanger(kc['value'])
+                        transaction_id = kc['value'][3]
+                        self.payments[transaction_id] = kc['value']
+                        self.crypto_sell_req(kc['value'])
 
                 if not data1:
                     break
@@ -165,7 +187,7 @@ class BANK(threading.Thread):
         s.sendall(x)
         s.close()
 
-    def pay_to_exchanger(self, payment_info):
+    def crypto_sell_req(self, payment_info):
         user_pub_key = payment_info[0]
         merchant_account = payment_info[1]
         amount = payment_info[2]
@@ -174,9 +196,9 @@ class BANK(threading.Thread):
 
         data = {}
 
-        data['type'] = "deligated_payment"
+        data['type'] = "crypto_sell_req"
         sig = None
-        data['value'] = [self.pub_key, self.name, sig, user_pub_key, amount, payment_id]
+        data['value'] = [user_pub_key, self.pub_key, amount, datetime.now(), sig]
 
         x = pickle.dumps(data)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -184,13 +206,12 @@ class BANK(threading.Thread):
         s.sendall(x)
         s.close()
 
-    def finalize_payment(self, payment_id):
-        payment_info = self.payments[payment_id]
-        user = payment_info[0]
-        amount = crypto_to_fiat(payment_info[1])
-        merchant = payment_info[2]
-        self.accounts[merchant] += amount
-        self.accounts[self.exchanger] -= amount
+    def finalize_payment(self, transaction_id, account_e):
+        info = self.payments[transaction_id]
+        merchant_pub_key = info[1]
+        amount = crypto_to_fiat(info[2])
+        self.accounts[merchant_pub_key] += amount
+        self.accounts[account_e] -= amount
 
 
 def send(self):

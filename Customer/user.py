@@ -71,7 +71,7 @@ class USER(threading.Thread):
                         self.certificate = kc['value'][0]
 
                 if not data1:
-                    break;
+                    break
 
         return
 
