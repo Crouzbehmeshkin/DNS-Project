@@ -96,7 +96,7 @@ class MERCHANT(threading.Thread):
 
         x = pickle.dumps(data)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('127.0.0.1', 8000))
+        s.connect(('127.0.0.1', 7200))
         s.sendall(x)
         s.close()
         sig = None
