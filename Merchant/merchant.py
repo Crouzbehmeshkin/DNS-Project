@@ -71,23 +71,41 @@ class MERCHANT(threading.Thread):
 
                     if kc['type'] == 'account_ack':
                         self.bank_pass = kc['value'][0]
-                    if kc['type'] == 'balance_response':
-                        self.bank_balance = kc['value'][0]
-                        self.check_payment()
+                    # if kc['type'] == 'balance_response':
+                    #     self.bank_balance = kc['value'][0]
+                    #     self.check_payment()
                     if kc['type'] == 'money_transaction_approved':
+                        account = kc['value'][0]
+                        amount = kc['value'][1]
+                        transaction_id = kc['value'][2]
+
                         self.approved_transaction = True
+                        self.approve_user_payment(account, amount, transaction_id)
                         print("merchant approves transaction!")
 
                 if not data1:
                     break;
 
         return
+    def approve_user_payment(self, account, amount, transaction_id):
+        data = {};
+        sig = None
+        data['type'] = "payment approved"
 
-    def check_payment(self):
-        if self.bank_balance == self.expected_balance:
-            print("balance correct")
-        else:
-            print("balance not correct")
+        data['value'] = [transaction_id, sig]
+
+        x = pickle.dumps(data)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(('127.0.0.1', 8000))
+        s.sendall(x)
+        s.close()
+        sig = None
+
+    # def check_payment(self):
+    #     if self.bank_balance == self.expected_balance:
+    #         print("balance correct")
+    #     else:
+    #         print("balance not correct")
 
     def send(self):
 
@@ -173,16 +191,16 @@ class MERCHANT(threading.Thread):
         s.close()
 
 
-    def request_bank_balance(self):
-        data = {}
-
-        data['type'] = "request_balance"
-        sig=None
-        data['value'] = [self.pub_key, sig]
-
-        x = pickle.dumps(data)
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('127.0.0.1', 7920))
-        s.sendall(x)
-        s.close()
+    # def request_bank_balance(self):
+    #     data = {}
+    #
+    #     data['type'] = "request_balance"
+    #     sig=None
+    #     data['value'] = [self.pub_key, sig]
+    #
+    #     x = pickle.dumps(data)
+    #     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #     s.connect(('127.0.0.1', 7920))
+    #     s.sendall(x)
+    #     s.close()
 

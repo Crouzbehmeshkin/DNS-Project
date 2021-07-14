@@ -156,7 +156,8 @@ class USER(threading.Thread):
                             self.pay(amount, merchant_account, transaction_id)
                         else:
                             raise Exception("payment info missmatch!")
-
+                    if kc['value'] == 'payment approved':
+                        print("user confirms payment approvement")
                 if not data1:
                     break
 
