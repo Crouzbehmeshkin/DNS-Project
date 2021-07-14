@@ -82,18 +82,18 @@ class BANK(threading.Thread):
                 if not data1:
                     break
 
-    def send_bank_balance(self, account_pub_key):
-        data = {}
-
-        data['type'] = "balance_response"
-        sig = None
-        data['value'] = [self.accounts[account_pub_key], self.pub_key, sig]
-
-        x = pickle.dumps(data)
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('127.0.0.1', 8000))
-        s.sendall(x)
-        s.close()
+    # def send_bank_balance(self, account_pub_key):
+    #     data = {}
+    #
+    #     data['type'] = "balance_response"
+    #     sig = None
+    #     data['value'] = [self.accounts[account_pub_key], self.pub_key, sig]
+    #
+    #     x = pickle.dumps(data)
+    #     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #     s.connect(('127.0.0.1', 8000))
+    #     s.sendall(x)
+    #     s.close()
 
     def L_block(self):
 
@@ -126,7 +126,11 @@ class BANK(threading.Thread):
         merchant_pub_key = info[1]
         amount = crypto_to_fiat(info[2])
         data['type'] = "money_transaction_approved"
-        sig = None
+        message = (str(merchant_pub_key) + str(amount) + str(transaction_id)).encode(
+            'utf-8')
+        sig = self.pri_key.sign(
+            message, padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+            hashes.SHA256())
         data['value'] = [merchant_pub_key, amount, transaction_id, sig]
 
         x = pickle.dumps(data)
@@ -181,7 +185,6 @@ class BANK(threading.Thread):
         data = {}
 
         data['type'] = "authentication_success"
-        sig = None
         data['value'] = [CID, "ACK"]
 
         x = pickle.dumps(data)
@@ -192,14 +195,19 @@ class BANK(threading.Thread):
 
     def crypto_sell_req(self, payment_info):
         user_pub_key = payment_info[0]
+        merchant_pub_key = payment_info[1]
         amount = payment_info[2]
         transaction_id = payment_info[3]
 
         data = {}
-
+        now = datetime.now()
         data['type'] = "crypto_sell_req"
-        sig = None
-        data['value'] = [user_pub_key, self.pub_key, amount, datetime.now(), sig, transaction_id]
+        message = (str(user_pub_key) + str(self.pub_key) + str(amount) + str(now)).encode(
+            'utf-8')
+        sig = self.pri_key.sign(
+            message, padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+            hashes.SHA256())
+        data['value'] = [user_pub_key, self.pub_key, amount, now , sig, transaction_id]
 
         x = pickle.dumps(data)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
