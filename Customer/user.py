@@ -195,10 +195,16 @@ class USER(threading.Thread):
                  last_valid_time=datetime.now() + relativedelta(months=+1), count_=10):
         data = {}
 
-        data['type'] = "deligatation"
-        # sig=None Todo
-
         policy = [amount_allowed, count_, last_valid_time, merchant_pub_key]
+
+        data['type'] = "deligatation"
+        message = (str(self.bank_public_key) + str(policy)).encode(
+            'utf-8')
+        sig = self.pri_key.sign(
+            message, padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+            hashes.SHA256())
+
+
         data['value'] = [self.bank_public_key, self.pub_key, policy, sig]
 
         x = pickle.dumps(data)
