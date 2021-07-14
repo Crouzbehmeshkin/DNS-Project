@@ -1,3 +1,6 @@
+import hashlib
+from datetime import datetime
+
 import numpy as np
 import socket
 import threading
@@ -133,15 +136,16 @@ class MERCHANT(threading.Thread):
         for n in t:
             n.join()
 
-    def payment_issue(self, user, amount):
+    def payment_request(self, account, amount):
         self.amount = amount
-        expected_balance = self.bank_balance + self.amount
-        # sends payment to the user
-        data = {};
+        self.expected_balance = self.bank_balance + self.amount
+        data = {}
 
-        data['type'] = "payment_issue"
+        data['type'] = "payment_request"
         sig=None
-        data['value'] = [self.pub_key, amount, sig]
+        client_info = str(account) + str(random.randint(1000, 10000))
+        transaction_id = hashlib.sha256((str(account) + str(amount) + str(client_info) + str(datetime.now())).encode('utf-8')).hexdigest()
+        data['value'] = [self.pub_key, amount, transaction_id, sig]
 
         x = pickle.dumps(data)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -149,8 +153,23 @@ class MERCHANT(threading.Thread):
         s.sendall(x)
         s.close()
 
+
+    def payment_approve(self, transaction_id):
+        data = {}
+        data['type'] = "payment_approved"
+        sig = None
+
+        data['value'] = [transaction_id, sig]
+
+        x = pickle.dumps(data)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(('127.0.0.1', 7990))
+        s.sendall(x)
+        s.close()
+
+
     def request_bank_balance(self):
-        data = {};
+        data = {}
 
         data['type'] = "request_balance"
         sig=None

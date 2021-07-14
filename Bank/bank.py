@@ -137,6 +137,10 @@ class BANK(threading.Thread):
 
                         self.user_ack.append((a, kc['value'][0]))
 
+                    if kc['type'] == "request_authentication":
+                        CID = kc['value'][1]
+                        self.is_authenticated[CID] = 1
+                        self.send_authentication_success()
                     if kc['type'] == 'CA certificate':
                         self.certificate = kc['value'][0]
 
@@ -148,17 +152,30 @@ class BANK(threading.Thread):
                     break
 
         return
+    def send_authentication_success(self, CID):
+        data = {}
+
+        data['type'] = "authentication_success"
+        sig = None
+        data['value'] = [CID, "ACK"]
+
+        x = pickle.dumps(data)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(('127.0.0.1', 6745))
+        s.sendall(x)
+        s.close()
 
     def pay_to_exchanger(self, payment_info):
         user_pub_key = payment_info[0]
-        amount = payment_info[1]
-        merchant_pub_key = payment_info[2]
+        merchant_account = payment_info[1]
+        amount = payment_info[2]
+        transaction_id = payment_info[3]
+        T = payment_info[4]
 
-        data = {};
+        data = {}
 
         data['type'] = "deligated_payment"
-        # sig = None
-        payment_id = len(self.payments)
+        sig = None
         data['value'] = [self.pub_key, self.name, sig, user_pub_key, amount, payment_id]
 
         x = pickle.dumps(data)

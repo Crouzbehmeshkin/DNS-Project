@@ -28,6 +28,10 @@ class USER(threading.Thread):
         self.bank_pass = 0
         self.amount = 0
         self.bank_public_key = 0
+        self.CID = ""
+        self.password = ""
+        self.is_authenticated = False
+
         self.csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
 
             x509.NameAttribute(NameOID.COUNTRY_NAME, u"US"),
@@ -82,7 +86,7 @@ class USER(threading.Thread):
 
             while True:
 
-                data1 = connection.recv(1024);
+                data1 = connection.recv(1024)
 
                 if data1:
 
@@ -95,9 +99,35 @@ class USER(threading.Thread):
                         self.certificate = kc['value'][0]
 
                 if not data1:
-                    break;
+                    break
 
         return
+    def L_bank(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(('127.0.0.1', 6745))
+        sock.listen(10)
+
+        while True:
+            connection, client_address = sock.accept()
+
+            while True:
+
+                data1 = connection.recv(1024)
+
+                if data1:
+
+                    kc = pickle.loads(data1)
+
+                    if kc['type'] == 'authentication_success':
+                        CID = kc['value'][0]
+                        if CID == self.CID:
+                            self.is_authenticated = True
+
+                if not data1:
+                    break
+
+        return
+
 
     def L_merchant(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -109,7 +139,7 @@ class USER(threading.Thread):
 
             while True:
 
-                data1 = connection.recv(1024);
+                data1 = connection.recv(1024)
 
                 if data1:
 
@@ -118,23 +148,41 @@ class USER(threading.Thread):
                     if kc['type'] == 'payment_issue':
                         merchant_pub_key_match = (kc['value'][0] == self.merchant_pub_key)
                         amount_match = (kc['value'][1] == self.amount)
-                        merchant_sig_match = True
+
+                        merchant_sig_match = True#todo
                         if merchant_pub_key_match and amount_match and merchant_sig_match:
-                            self.pay(kc['value'][1], self.merchant_pub_key)
+                            merchant_account = kc['value'][1]
+                            amount = kc['value'][2]
+                            transaction_id = kc['value'][3]
+                            self.pay(amount, merchant_account, transaction_id)
                         else:
                             raise Exception("payment info missmatch!")
 
                 if not data1:
-                    break;
+                    break
 
         return
 
-    def pay(self, amount, merchant_pub_key):
+    def request_authentication(self):
+        data = {}
+
+        data['type'] = "request_authentication"
+        sig = None
+        data['value'] = [self.pub_key, self.CID, self.password]
+
+        x = pickle.dumps(data)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(('127.0.0.1', 8000))
+        s.sendall(x)
+        s.close()
+
+    def pay(self, amount, merchant_pub_key, transaction_id):
         data = {}
 
         data['type'] = "payment"
-
-        data['value'] = [self.pub_key, fiat_to_crypto(amount), merchant_pub_key]
+        sig = None
+        now = datetime.now()
+        data['value'] = [self.pub_key, merchant_pub_key, fiat_to_crypto(amount), transaction_id, now, sig]
 
         x = pickle.dumps(data)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -144,7 +192,7 @@ class USER(threading.Thread):
 
     def deligate(self, amount_allowed, merchant_pub_key,
                  last_valid_time=datetime.now() + relativedelta(months=+1), count_=10):
-        data = {};
+        data = {}
 
         data['type'] = "deligatation"
         # sig=None Todo
