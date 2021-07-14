@@ -1,11 +1,11 @@
 import socket
 
 
-def __init__(self, host, port):
+def __init__(self, host, port, cert=None, key=None):
     self.host = host
     self.port = port
-    self.cert = None
-    self.key = None
+    self.cert = cert
+    self.key = key
 
 
 def receive_message(self):
