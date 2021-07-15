@@ -13,6 +13,21 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes
 
+CA_HOST = "127.0.0.1"
+CA_PORT = 9001
+
+BANK_HOST = "127.0.0.1"
+BANK_PORT = 9002
+
+MERCHANT_HOST = "127.0.0.1"
+MERCHANT_PORT = 9003
+
+CUSTOMER_HOST = "127.0.0.1"
+CUSTOMER_PORT = 9004
+
+EXCHANGE_HOST = "127.0.0.1"
+EXCHANGE_PORT = 9005
+
 
 class BLOCKCHAIN(threading.Thread):
 

@@ -15,12 +15,29 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes
 from utils.currency_change import *
+from SocketManager.SocketManager import SocketManager
+# from CA.CA import CA_PORT, CA_HOST
+
+CA_HOST = "127.0.0.1"
+CA_PORT = 9001
+
+BANK_HOST = "127.0.0.1"
+BANK_PORT = 9002
+
+MERCHANT_HOST = "127.0.0.1"
+MERCHANT_PORT = 9003
+
+CUSTOMER_HOST = "127.0.0.1"
+CUSTOMER_PORT = 9004
+
+EXCHANGE_HOST = "127.0.0.1"
+EXCHANGE_PORT = 9005
 
 
 class BANK(threading.Thread):
     # todo: we should put a zero balance (accounts[pub_key] = 0) for every new user and merchant introduced
 
-    def __init__(self, id, location, n):
+    def __init__(self, host, port):
 
         threading.Thread.__init__(self)
 
@@ -57,69 +74,83 @@ class BANK(threading.Thread):
 
         ).sign(self.pri_key, hashes.SHA256())
 
-    def L_merchant(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('127.0.0.1', 7920))
-        sock.listen(10)
+        self.host = host
+        self.port = port
+        self.sm = SocketManager(host, port)
 
-        while True:
-            connection, client_address = sock.accept()
+        binary_msg = self.sm.convert_to_binary((host, port, str.encode(self.csr)))
+        binary_cert = self.sm.send_message(CA_HOST, CA_PORT, binary_msg)
+        self.cert = self.sm.convert_to_obj(binary_cert)
+        print(self.cert.public_bytes(serialization.Encoding.PEM))
 
-            while True:
 
-                data1 = connection.recv(1024)
 
-                if data1:
-
-                    kc = pickle.loads(data1)
-
-                    if kc['type'] == 'request_balance':
-                        merchant_pub_key = kc['value'][0]
-                        authenticated = True  # should really authenticate the merchant pubkey and sig
-                        if authenticated:
-                            self.send_bank_balance(merchant_pub_key)
-
-                if not data1:
-                    break
-
-    # def send_bank_balance(self, account_pub_key):
-    #     data = {}
+    #  def L_merchant(self):
     #
-    #     data['type'] = "balance_response"
-    #     sig = None
-    #     data['value'] = [self.accounts[account_pub_key], self.pub_key, sig]
     #
-    #     x = pickle.dumps(data)
-    #     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #     s.connect(('127.0.0.1', 8000))
-    #     s.sendall(x)
-    #     s.close()
+    #     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #     sock.bind(('127.0.0.1', 7920))
+    #     sock.listen(10)
+    #
+    #     while True:
+    #         connection, client_address = sock.accept()
+    #
+    #         while True:
+    #
+    #             data1 = connection.recv(1024)
+    #
+    #             if data1:
+    #
+    #                 kc = pickle.loads(data1)
+    #
+    #                 if kc['type'] == 'request_balance':
+    #                     merchant_pub_key = kc['value'][0]
+    #                     authenticated = True  # should really authenticate the merchant pubkey and sig
+    #                     if authenticated:
+    #                         self.send_bank_balance(merchant_pub_key)
+    #
+    #             if not data1:
+    #                 break
+    #
+    # # def send_bank_balance(self, account_pub_key):
+    # #     data = {}
+    # #
+    # #     data['type'] = "balance_response"
+    # #     sig = None
+    # #     data['value'] = [self.accounts[account_pub_key], self.pub_key, sig]
+    # #
+    # #     x = pickle.dumps(data)
+    # #     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # #     s.connect(('127.0.0.1', 8000))
+    # #     s.sendall(x)
+    # #     s.close()
 
     def L_block(self):
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('127.0.0.1', 6700))
-        sock.listen(10)
+        # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # sock.bind(('127.0.0.1', 6700))
+        # sock.listen(10)
+        #
+        # while True:
+        #     connection, client_address = sock.accept()
+        #
+        #     while True:
 
-        while True:
-            connection, client_address = sock.accept()
+        data1 = self.sm.receive_message()
 
-            while True:
+        if data1:
+            kc = pickle.loads(data1)
 
-                data1 = connection.recv(1024)
+            if kc['type'] == 'sell_transaction_approved':
+                account_e = kc['value'][3]
+                transaction_id = kc['value'][-1]
+                self.finalize_payment(transaction_id, account_e)
+                self.approve_money_transaction(transaction_id)
+        #
+        # if not data1:
+        #     break
 
-                if data1:
 
-                    kc = pickle.loads(data1)
-
-                    if kc['type'] == 'sell_transaction_approved':
-                        account_e = kc['value'][3]
-                        transaction_id = kc['value'][-1]
-                        self.finalize_payment(transaction_id, account_e)
-                        self.approve_money_transaction(transaction_id)
-
-                if not data1:
-                    break
     def approve_money_transaction(self, transaction_id):
         data = {}
         info = self.payments[transaction_id]
@@ -134,53 +165,53 @@ class BANK(threading.Thread):
         data['value'] = [merchant_pub_key, amount, transaction_id, sig]
 
         x = pickle.dumps(data)
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('127.0.0.1', 8000))
-        s.sendall(x)
-        s.close()
+        self.sm.send_message(MERCHANT_HOST, MERCHANT_PORT, x)
+
+        # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # s.connect(('127.0.0.1', 8000))
+        # s.sendall(x)
+        # s.close()
 
     def L_USER(self):
+        data1 = self.sm.receive_message()
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('127.0.0.1', 8000))
-        sock.listen(10)
+        # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # sock.bind(('127.0.0.1', 8000))
+        # sock.listen(10)
+        #
+        # while True:
+        #     connection, client_address = sock.accept()
+        #
+        #     while True:
+        #
+        #         data1 = connection.recv(1024)
+        #
+        #         if data1:
 
-        while True:
-            connection, client_address = sock.accept()
+        kc = pickle.loads(data1)
 
-            while True:
+        if kc['type'] == 'Account_bank':
+            self.Users.append(kc['value'][1])
+            a = random.randint(1000, 10000)
+            self.info.append(kc['value'][2], a)
 
-                data1 = connection.recv(1024)
+            self.user_ack.append((a, kc['value'][0]))
 
-                if data1:
+        if kc['type'] == "request_authentication":
+            CID = kc['value'][1]
+            password = kc['value'][2]
+            if self.passwords[CID] == password:
+                self.is_authenticated[CID] = 1
+                self.send_authentication_success(CID)
+        if kc['type'] == 'CA certificate':
+            self.certificate = kc['value'][0]
 
-                    kc = pickle.loads(data1)
+        if kc['type'] == 'payment':
+            transaction_id = kc['value'][3]
+            self.payments[transaction_id] = kc['value']
+            self.crypto_sell_req(kc['value'])
 
-                    if kc['type'] == 'Account_bank':
-                        self.Users.append(kc['value'][1])
-                        a = random.randint(1000, 10000)
-                        self.info.append(kc['value'][2], a)
 
-                        self.user_ack.append((a, kc['value'][0]))
-
-                    if kc['type'] == "request_authentication":
-                        CID = kc['value'][1]
-                        password = kc['value'][2]
-                        if self.passwords[CID] == password:
-                            self.is_authenticated[CID] = 1
-                            self.send_authentication_success(CID)
-                    if kc['type'] == 'CA certificate':
-                        self.certificate = kc['value'][0]
-
-                    if kc['type'] == 'payment':
-                        transaction_id = kc['value'][3]
-                        self.payments[transaction_id] = kc['value']
-                        self.crypto_sell_req(kc['value'])
-
-                if not data1:
-                    break
-
-        return
     def send_authentication_success(self, CID):
         data = {}
 
@@ -188,10 +219,11 @@ class BANK(threading.Thread):
         data['value'] = [CID, "ACK"]
 
         x = pickle.dumps(data)
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('127.0.0.1', 6745))
-        s.sendall(x)
-        s.close()
+        self.sm.send_message(CUSTOMER_HOST, CUSTOMER_PORT, x)
+        # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # s.connect(('127.0.0.1', 6745))
+        # s.sendall(x)
+        # s.close()
 
     def crypto_sell_req(self, payment_info):
         user_pub_key = payment_info[0]
@@ -210,10 +242,11 @@ class BANK(threading.Thread):
         data['value'] = [user_pub_key, self.pub_key, amount, now , sig, transaction_id]
 
         x = pickle.dumps(data)
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('127.0.0.1', 6000))
-        s.sendall(x)
-        s.close()
+        self.sm.send_message(EXCHANGE_HOST, EXCHANGE_PORT, x)
+        # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # s.connect(('127.0.0.1', 6000))
+        # s.sendall(x)
+        # s.close()
 
     def finalize_payment(self, transaction_id, account_e):
         info = self.payments[transaction_id]
@@ -274,3 +307,5 @@ def run1(self):
 
     for n in t:
         n.join()
+
+bank = BANK(BANK_HOST, BANK_PORT)

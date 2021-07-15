@@ -121,6 +121,10 @@ class SocketManager:
 
         client.close()
 
+    def convert_csr_to_str(self, csr):
+        return csr
+
+
     def convert_to_binary(self, obj):
         return pickle.dumps(obj)
 
